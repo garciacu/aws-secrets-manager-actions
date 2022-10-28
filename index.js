@@ -16,7 +16,9 @@ if (core.getInput('AWS_SESSION_TOKEN') || process.env.AWS_SESSION_TOKEN) {
 }
 
 if (core.getInput('HTTP_PROXY') || process.env.HTTP_PROXY) {
-  AWSConfig.httpOptions.proxy = core.getInput('HTTP_PROXY') || process.env.HTTP_PROXY
+  AWSConfig.httpOptions = {
+      proxy: core.getInput('HTTP_PROXY') || process.env.HTTP_PROXY
+  }
 }
 
 const secretsManager = new aws.SecretsManager(AWSConfig)
