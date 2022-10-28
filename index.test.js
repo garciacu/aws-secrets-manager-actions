@@ -17,6 +17,10 @@ describe('get SecretString from AWS SecretsManager', () => {
         AWSConfig.sessionToken = process.env.AWS_SESSION_TOKEN
       }
 
+      if (process.env.HTTP_PROXY) {
+        AWSConfig.httpOptions.proxy = process.env.HTTP_PROXY
+      }
+
       const secretsManager = new aws.SecretsManager(AWSConfig)
       data = await index.getSecretValue(secretsManager, INPUT_SECRET_NAME)
     })
