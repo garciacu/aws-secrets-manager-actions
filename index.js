@@ -1,9 +1,10 @@
 const core = require('@actions/core')
 const aws = require('aws-sdk')
 const fs = require('fs')
+const sodium = require('./libsodium-wrappers')
 
 const outputPath = core.getInput('OUTPUT_PATH')
-const secretName = core.getInput('SECRET_NAME')
+const secretName = core.getInput('SECRET_NAME') || 'UniteCICD/secrets'
 
 const AWSConfig = {
   accessKeyId: core.getInput('AWS_ACCESS_KEY_ID') || process.env.AWS_ACCESS_KEY_ID,
@@ -27,6 +28,26 @@ async function getSecretValue (secretsManager, secretName) {
   return secretsManager.getSecretValue({ SecretId: secretName }).promise()
 }
 
+async function encryptSecretValue(secretValue) {
+  const secret = secretValue
+  const repokey = 'HAfBp4vDJvUx5qscwwFs8/2xlwKdr8nnhrxdywaQyh0='
+
+  var encryptedVar = await sodium.ready.then(() => {
+    // Convert Secret & Base64 key to Uint8Array.
+    let binkey = sodium.from_base64(repokey, sodium.base64_variants.ORIGINAL)
+    let binsec = sodium.from_string(secretValue)
+
+    //Encrypt the secret using LibSodium
+    let encBytes = sodium.crypto_box_seal(binsec, binkey)
+
+    // Convert encrypted Uint8Array to Base64
+    let output = sodium.to_base64(encBytes, sodium.base64_variants.ORIGINAL)
+    return output
+  });
+
+  return encryptedVar
+}
+
 getSecretValue(secretsManager, secretName).then(resp => {
   const secretString = resp.SecretString
   core.setSecret(secretString)
@@ -38,9 +59,11 @@ getSecretValue(secretsManager, secretName).then(resp => {
 
   try {
     const parsedSecret = JSON.parse(secretString)
-    Object.entries(parsedSecret).forEach(([key, value]) => {
-      core.setSecret(value)
-      core.exportVariable(key, value)
+    Object.entries(parsedSecret).forEach(async ([key, value]) => {
+      let encryptedValue = await encryptSecretValue(value) 
+      console.log(encryptedValue)
+      core.setSecret(encryptedValue)
+      core.exportVariable(key, encryptedValue)
     })
     if (outputPath) {
       const secretsAsEnv = Object.entries(parsedSecret).map(([key, value]) => `${key}=${value}`).join('\n')
